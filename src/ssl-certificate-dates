@@ -1,0 +1,63 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Date::Parse 'str2time';
+use IPC::Run3 'run3';
+use POSIX 'strftime';
+
+my $domain = shift;
+if (!$domain || $domain =~ /^(-h|--help)$/) {
+    die "Usage: $0 domain\n";
+}
+
+$domain =~ s{^https?://}{};
+$domain =~ s{/.*}{};
+
+my @s_client = ("openssl", "s_client", "-servername", $domain, "-connect", "$domain:443");
+my @x509 = ("openssl", "x509", "-noout", "-dates");
+
+run3 \@s_client, \undef, \my $out, \my $err;
+die $err if $? != 0;
+
+undef $err;
+run3 \@x509, \$out, \my $date, \$err;
+die $err if $? != 0;
+
+my ($begin)  = $date =~ /notBefore\s*=\s*([^\n]+)/;
+my ($expire) = $date =~ /notAfter\s*=\s*([^\n]+)/;
+$begin  = str2time $begin;
+$expire = str2time $expire;
+my $duration = int( ($expire - $begin) / (24*60*60) );
+my $left = int( ($expire - time) /  (24*60*60) );
+$begin  = strftime "%Y-%m-%d %H:%M:%S %Z", localtime $begin;
+$expire = strftime "%Y-%m-%d %H:%M:%S %Z", localtime $expire;
+
+print <<"___";
+Begin:    $begin
+Expire:   $expire
+Duration: $duration days
+Left:     $left days
+___
+
+=encoding utf-8
+
+=head1 NAME
+
+ssl-certificate-dates - show ssl certificate dates
+
+=head1 SYNOPSIS
+
+  ❯ ssl-certificate-dates www.google.com
+  Begin:    2018-06-19 20:38:49 JST
+  Expire:   2018-08-28 20:31:00 JST
+  Duration: 69 days
+  Left:     44 days
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2018 Shoichi Kaji E<lt>skaji@cpan.orgE<gt>
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut
