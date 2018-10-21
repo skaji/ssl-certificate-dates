@@ -388,17 +388,18 @@ $domain =~ s{^https?://}{};
 $domain =~ s{/.*}{};
 
 my @s_client = ("openssl", "s_client", "-servername", $domain, "-connect", "$domain:443");
-my @x509 = ("openssl", "x509", "-noout", "-dates");
+my @x509 = ("openssl", "x509", "-noout", "-dates", "-issuer");
 
 run3 \@s_client, \undef, \my $out, \my $err;
 die $err if $? != 0;
 
 undef $err;
-run3 \@x509, \$out, \my $date, \$err;
+run3 \@x509, \$out, \my $res, \$err;
 die $err if $? != 0;
 
-my ($begin)  = $date =~ /notBefore\s*=\s*([^\n]+)/;
-my ($expire) = $date =~ /notAfter\s*=\s*([^\n]+)/;
+my ($begin)  = $res =~ /notBefore\s*=\s*([^\n]+)/;
+my ($expire) = $res =~ /notAfter\s*=\s*([^\n]+)/;
+my ($cn) = $res =~ /\bCN\s*=\s*(\S[^\n]*)/;
 $begin  = str2time $begin;
 $expire = str2time $expire;
 my $duration = int( ($expire - $begin) / (24*60*60) );
@@ -411,6 +412,7 @@ Begin:    $begin
 Expire:   $expire
 Duration: $duration days
 Left:     $left days
+CN:       $cn
 ___
 
 =encoding utf-8
